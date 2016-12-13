@@ -14,19 +14,16 @@
 	Cuel 2015-12-10
 */
 
-params [["_amount", count FP_JRM_savedState, [0]]];
-private _plrs = allPlayers;
-private _ret = [];
+params [["_maxReturnAmount", -1]];
+private _plrs = [] call CBA_fnc_players;
+private _uids = _plrs apply {getPlayerUID _x};
+private _aliveUids = [];
 
-{
-  _x params ["_uid"];
-  {
-    if (alive _x && {getPlayerUID _x == _uid}) exitWith {
-      _ret pushBack _x;
-    };
-  } forEach _plrs;
+[fp_jrm_state, {
+  _value params [["_remainingRespawns", -1]];
+  if (_remainingRespawns isEqualTo 0) then {
+    if (_key in _uids && {_maxReturnAmount < count _aliveUids}) then {_aliveUids pushBackUnique _key};
+  };
+}] call CBA_fnc_hashEachPair;
 
-  if (count _ret >= _amount) exitWith {};
-} forEach (FP_JRM_savedState select {(_x select 1) == 0});
-
-_ret
+(_plrs select {(getPlayerUID _x) in _aliveUids})
