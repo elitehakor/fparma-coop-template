@@ -7,15 +7,23 @@
 		Can also be used to respawn a single unit when called locally
 
 	Parameters:
-	_posOrCode - A marker, object, position,  or code (can also be string code) (_this select 0 will be the unit for code)
+	_posOrCode - A marker, object, position,  or code (can also be string code) (will be called with [unit, msTime on respawn).
+  this function needs to handle calling fp_fnc_spectate on its own
 		If position, will be teleported there after exiting spectator
     If code, the code is assumed to handle turning spectator off (FP_fnc_spectate)
 		If nil, ace spectator will teleport the unit back to where he was when entering spectator (respawn pos)
-	_reset - Clear all previous dead units [Default: false]
 
     Example:
     (begin example)
-        ["respawn_west", true] call FP_JRM_fnc_forceRespawn;
+        ["respawn_west"] call FP_JRM_fnc_forceRespawn;
+        
+        [{
+          params ["_unit", "_msTime"];
+          if (_msTime < CBA_missionTime + 5) then {
+            [false] call fp_fnc_spectate;
+            player moveInCargo c130;
+          };
+        }] call FP_JRM_fnc_forceRespawn;
     (end)
 
 	Author:
