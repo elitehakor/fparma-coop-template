@@ -5,75 +5,52 @@
         Initializes the jip and respawn manager.
         This function is called automatically.
 */
-if (isNil "FP_JRM_savedState") then {FP_JRM_savedState = []};
-if (FP_JRM_respawns < 0) exitWith {};
-if (!isNil "FP_JRM_initialized") exitWith {};
-FP_JRM_initialized = true;
+
+#include "script_macros.hpp"
+
+// hash of uids with remanining respawns. format [respawns, msTime on respawn]. read only on clients
+if (isNil "fp_jrm_state") then {fp_jrm_state = [] call CBA_fnc_hashCreate};
 
 if (isServer) then {
-  // If players disconnect while unconscious, count as a death
+  ["fp_jrm_onDeath", fp_jrm_fnc_update] call CBA_fnc_addEventHandler;
+
   addMissionEventHandler ["HandleDisconnect", {
     params ["_unit", "", ["_uid", ""]];
-
-    if (!alive _unit || _uid == "" || {!(_unit getVariable ["ACE_isUnconscious", false])}) exitWith {false};
-    private _idx = -1;
-    private _livesLeft = (FP_JRM_respawns - 1) max 0;
-
-    {
-      if (_x select 0 == _uid) exitWith {
-      _idx = _forEachIndex;
-      _livesLeft = ((_x select 1) - 1) max 0;
-      };
-    } forEach FP_JRM_savedState;
-
-    if (_idx > -1) then {
-      FP_JRM_savedState set [_idx, [_uid, _livesLeft]];
-    } else {
-      FP_JRM_savedState pushBack [_uid, _livesLeft];
+    if (_uid != "" && {_unit getVariable ["ACE_isUnconscious", false]}) then {
+      [_uid, side group _unit] call fp_jrm_fnc_update;
     };
-    publicVariable "FP_JRM_savedState";
     false
   }];
 };
 
-/*
-    Clients
-*/
-if (!hasInterface) exitWith {};
-FP_JRM_lives = FP_JRM_respawns;
+if (hasInterface) then {
+  player addEventHandler ["Respawn", {
+    // ignore zeus
+    if (!isNull (getAssignedCuratorLogic player)) exitWith {};
 
-player addEventHandler ["Respawn", {
-  private _idx = -1;
-  private _uid = getPlayerUID player;
-  FP_JRM_lives = (FP_JRM_lives - 1) max 0;
+    private _uid = getPlayerUID player;
+    GET_UID_DATA(_uid) params [["_remainingRespawns", -1]];
+    if (_remainingRespawns isEqualTo 0) then {
+      [true] call FP_fnc_spectate;
+      private _msg = format ["%1 is spectating. (%2 total)", name player, count (call FP_jrm_fnc_getSpectators)];
+      [objNull, _msg] remoteExecCall ["bis_fnc_showCuratorFeedbackMessage", 0];
+    };
+    ["fp_jrm_onDeath", [_uid, side group player]] call CBA_fnc_serverEvent;
+  }];
 
-  if (FP_JRM_lives == 0) then {[true] call FP_fnc_spectate};
-
-  // Update state
-  {
-    if (_x select 0 == _uid) exitWith {_idx = _forEachIndex};
-  } forEach FP_JRM_savedState;
-
-  if (_idx > -1) then {
-    FP_JRM_savedState set [_idx, [_uid, FP_JRM_lives]];
-  } else {
-    FP_JRM_savedState pushBack [_uid, FP_JRM_lives];
-  };
-  publicVariable "FP_JRM_savedState";
-}];
-
-// If player rejoin, get their amount of lives and start spect if they're are considered dead
-private _uid = getPlayerUID player;
-{
-  if (_x select 0 == _uid) exitWith {
-    FP_JRM_lives = _x select 1;
-    if (FP_JRM_lives == 0) then {
-      [{time > 0.1}, {
-        [true] call FP_fnc_spectate;
-      }, []] call CBA_fnc_waitUntilAndExecute;
+  GET_UID_DATA(getPlayerUID player) params [["_remainingRespawns", -1]];
+  // check if player was dead and has reconnented
+  if (_remainingRespawns isEqualTo 0) then {
+    // use spawn here to ensure briefing screen is gone
+    // it seems to also work for ace spect camera at [0 ,0] bug
+    [] spawn {
+      sleep 1;
+      {[true] call FP_fnc_spectate} call CBA_fnc_directCall;
+      private _msg = format ["%1 is spectating. (%2 total)", name player, count (call FP_jrm_fnc_getSpectators)];
+      [objNull, _msg] remoteExecCall ["bis_fnc_showCuratorFeedbackMessage", 0];
     };
   };
-} forEach FP_JRM_savedState;
+};
 
 // Add ARES respawn functionality
 if (!isNil "Ares_fnc_RegisterCustomModule" && isNil "FP_ares_jrm") then {
