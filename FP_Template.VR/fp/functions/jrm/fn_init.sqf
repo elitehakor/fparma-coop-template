@@ -29,7 +29,8 @@ if (hasInterface) then {
     if (!isNull (getAssignedCuratorLogic player)) exitWith {};
 
     private _uid = getPlayerUID player;
-    GET_UID_DATA(_uid) params [["_remainingRespawns", -1]];
+    private _default = [fp_jrm_respawns, side group player] call CBA_fnc_hashGet;
+    GET_UID_DATA(_uid) params [["_remainingRespawns", _default];
     if (_remainingRespawns isEqualTo 0) then {
       [true] call FP_fnc_spectate;
       private _msg = format ["%1 is spectating. (%2 total)", name player, count (call FP_jrm_fnc_getSpectators)];
