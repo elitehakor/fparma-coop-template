@@ -30,5 +30,6 @@ class FP_JRM {
     class forceRespawn;
     class getSpectators;
     class init;
+    class update;
   };
 };
